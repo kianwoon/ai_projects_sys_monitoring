@@ -59,6 +59,26 @@ Each service configuration includes:
 
 If a service name is not found in the configuration, the system will use the default recipients.
 
+### Service Status Logging
+
+The application automatically logs all service status changes and alert attempts to daily CSV files in the `service_logs` directory. The files are named in the format `YY_MM_DD.csv` (e.g., `23_03_15.csv` for March 15, 2023).
+
+Each log entry contains:
+- Timestamp: Date and time of the status check
+- Service Name: Name of the monitored service
+- Status: Current status (UP/DOWN)
+- Alert Sent: Whether an alert was successfully sent
+- Alert Type: Type of alert (Email/WhatsApp)
+- Recipients: List of recipients who received the alert
+
+Example log entry:
+```csv
+Timestamp,Service Name,Status,Alert Sent,Alert Type,Recipients
+2023-03-15 14:30:45,database,DOWN,True,Email,db-team@company.com,dba@company.com
+2023-03-15 14:30:46,database,DOWN,True,WhatsApp,+1234567890,group:db-team
+2023-03-15 14:31:45,api-gateway,UP,False,,
+```
+
 ## Usage
 
 1. Position your camera to capture the Grafana dashboard clearly
@@ -72,6 +92,7 @@ If a service name is not found in the configuration, the system will use the def
    - Capture dashboard images every minute
    - Process the image to detect service status
    - Send targeted notifications to service-specific teams when services are down
+   - Log all status changes and alert attempts to daily CSV files
    - Print status updates to the console
 
 Press Ctrl+C to stop monitoring.
@@ -86,6 +107,11 @@ Press Ctrl+C to stop monitoring.
    - Sends email alerts via SMTP to service-specific teams
    - Sends WhatsApp messages to individual numbers and group chats
    - Falls back to default recipients if no specific configuration is found
+5. **Status Logging**:
+   - Creates daily CSV files for status tracking
+   - Records all service statuses and alert attempts
+   - Maintains history of service availability
+   - Enables analysis of service reliability and alert effectiveness
 
 ## Troubleshooting
 
@@ -101,6 +127,10 @@ Press Ctrl+C to stop monitoring.
    - Service names are matched case-insensitively
    - Special characters are removed for matching
    - If a service doesn't match any configuration, default recipients are used
+7. **Logging Issues**:
+   - Check write permissions in the `service_logs` directory
+   - Ensure sufficient disk space for log files
+   - CSV files can be opened in Excel or any spreadsheet software for analysis
 
 ## License
 
