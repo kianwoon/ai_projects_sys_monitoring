@@ -1,1 +1,5 @@
-opencv-python>=4.5.3numpy>=1.19.0pytesseract>=0.3.8Pillow>=8.0.0
+opencv-python==4.8.1.78
+numpy==1.24.3
+pytesseract==0.3.10
+python-dotenv==1.0.0
+Pillow==10.0.0
