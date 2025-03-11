@@ -1,6 +1,6 @@
 # Grafana Dashboard Monitor
 
-This application monitors a Grafana dashboard through your computer's camera and sends email alerts when services are detected as down. It uses computer vision and OCR to detect service status based on color indicators (red for down, green for up).
+This application monitors a Grafana dashboard through your computer's camera and sends email and WhatsApp alerts when services are detected as down. It uses computer vision and OCR to detect service status based on color indicators (red for down, green for up).
 
 ## Prerequisites
 
@@ -8,6 +8,7 @@ This application monitors a Grafana dashboard through your computer's camera and
 2. Tesseract OCR engine installed on your system
 3. A webcam or camera connected to your computer
 4. SMTP access for sending email alerts (e.g., Gmail account)
+5. WhatsApp Web access for sending WhatsApp messages
 
 ## Installation
 
@@ -26,22 +27,24 @@ This application monitors a Grafana dashboard through your computer's camera and
    - Update the following variables in `.env`:
      - `EMAIL_SENDER`: Your email address
      - `EMAIL_PASSWORD`: Your email app password (for Gmail, create an App Password)
-     - `EMAIL_RECIPIENTS`: Comma-separated list of recipients
+     - `EMAIL_RECIPIENTS`: Comma-separated list of email recipients
      - `SMTP_SERVER`: SMTP server (default: smtp.gmail.com)
      - `SMTP_PORT`: SMTP port (default: 587)
+     - `WHATSAPP_NUMBERS`: Comma-separated list of WhatsApp numbers with country code (e.g., +1234567890)
 
 ## Usage
 
 1. Position your camera to capture the Grafana dashboard clearly
-2. Run the monitoring script:
+2. Ensure you're logged into WhatsApp Web in your default browser
+3. Run the monitoring script:
    ```bash
    python monitor.py
    ```
 
-3. The script will:
+4. The script will:
    - Capture dashboard images every minute
    - Process the image to detect service status
-   - Send email alerts when services are detected as down
+   - Send email and WhatsApp alerts when services are detected as down
    - Print status updates to the console
 
 Press Ctrl+C to stop monitoring.
@@ -51,7 +54,9 @@ Press Ctrl+C to stop monitoring.
 1. **Image Capture**: Uses OpenCV to capture images from your camera
 2. **Color Detection**: Processes images in HSV color space to detect red (down) and green (up) indicators
 3. **Text Extraction**: Uses Tesseract OCR to extract service names from regions around color indicators
-4. **Alert System**: Sends email alerts via SMTP when services are detected as down
+4. **Alert System**: 
+   - Sends email alerts via SMTP
+   - Sends WhatsApp messages via pywhatkit
 
 ## Troubleshooting
 
@@ -59,6 +64,10 @@ Press Ctrl+C to stop monitoring.
 2. **OCR Quality**: Adjust camera position and focus for clear text capture
 3. **Email Alerts**: For Gmail, use App Passwords if 2FA is enabled
 4. **Color Detection**: Adjust HSV thresholds in code if needed for your specific dashboard
+5. **WhatsApp Alerts**:
+   - Make sure you're logged into WhatsApp Web in your default browser
+   - The first time you run the script, you may need to scan the QR code
+   - If messages aren't sending, try increasing the `wait_time` parameter in the code
 
 ## License
 

@@ -3,6 +3,7 @@ import numpy as np
 import pytesseract
 import smtplib
 import os
+import pywhatkit
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
@@ -20,6 +21,7 @@ class DashboardMonitor:
         self.email_recipients = os.getenv('EMAIL_RECIPIENTS', '').split(',')
         self.smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
         self.smtp_port = int(os.getenv('SMTP_PORT', '587'))
+        self.whatsapp_numbers = os.getenv('WHATSAPP_NUMBERS', '').split(',')
         
         # Define color thresholds for red and green in HSV
         self.red_lower = np.array([0, 120, 70])
@@ -66,7 +68,36 @@ class DashboardMonitor:
         
         return services
 
-    def send_alert(self, down_services):
+    def send_whatsapp_alert(self, down_services):
+        """Send WhatsApp alert for down services"""
+        if not down_services or not self.whatsapp_numbers:
+            return
+
+        message = f"🚨 ALERT: Services Down - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+        message += "The following services are currently DOWN:\n"
+        message += "\n".join([f"❌ {service}" for service in down_services])
+
+        current_time = datetime.now()
+        # Add 2 minutes to ensure message gets sent (pywhatkit requires future time)
+        send_time = current_time.replace(minute=current_time.minute + 2)
+
+        for number in self.whatsapp_numbers:
+            if not number.strip():
+                continue
+            try:
+                pywhatkit.sendwhatmsg(
+                    number.strip(),
+                    message,
+                    send_time.hour,
+                    send_time.minute,
+                    wait_time=15,
+                    tab_close=True
+                )
+                print(f"WhatsApp alert sent to {number}")
+            except Exception as e:
+                print(f"Failed to send WhatsApp alert to {number}: {str(e)}")
+
+    def send_email_alert(self, down_services):
         """Send email alert for down services"""
         if not down_services or not self.email_sender or not self.email_password:
             return
@@ -85,6 +116,7 @@ class DashboardMonitor:
                 server.starttls()
                 server.login(self.email_sender, self.email_password)
                 server.send_message(msg)
+                print("Email alert sent successfully")
         except Exception as e:
             print(f"Failed to send email alert: {str(e)}")
 
@@ -100,10 +132,11 @@ class DashboardMonitor:
                 down_services = self.extract_text(image, red_mask)
                 up_services = self.extract_text(image, green_mask)
                 
-                # Send alert if any services are down
+                # Send alerts if any services are down
                 if down_services:
                     print(f"Services DOWN: {down_services}")
-                    self.send_alert(down_services)
+                    self.send_email_alert(down_services)
+                    self.send_whatsapp_alert(down_services)
                 
                 print(f"Services UP: {up_services}")
                 
