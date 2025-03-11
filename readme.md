@@ -27,10 +27,37 @@ This application monitors a Grafana dashboard through your computer's camera and
    - Update the following variables in `.env`:
      - `EMAIL_SENDER`: Your email address
      - `EMAIL_PASSWORD`: Your email app password (for Gmail, create an App Password)
-     - `EMAIL_RECIPIENTS`: Comma-separated list of email recipients
+     - `EMAIL_RECIPIENTS`: Default list of email recipients
      - `SMTP_SERVER`: SMTP server (default: smtp.gmail.com)
      - `SMTP_PORT`: SMTP port (default: 587)
-     - `WHATSAPP_NUMBERS`: Comma-separated list of WhatsApp numbers with country code (e.g., +1234567890)
+     - `WHATSAPP_NUMBERS`: Default list of WhatsApp numbers
+     - `SERVICE_CONFIGS`: JSON configuration for service-specific notifications
+
+### Service-Specific Configuration
+
+The `SERVICE_CONFIGS` in `.env` allows you to define different notification targets for different services. Example configuration:
+
+```json
+SERVICE_CONFIGS={
+    "database": {
+        "email": ["db-team@company.com", "dba@company.com"],
+        "whatsapp": ["+1234567890"],
+        "whatsapp_groups": ["https://chat.whatsapp.com/db-team"]
+    },
+    "api-gateway": {
+        "email": ["api-team@company.com"],
+        "whatsapp": ["+0987654321"],
+        "whatsapp_groups": ["https://chat.whatsapp.com/api-team"]
+    }
+}
+```
+
+Each service configuration includes:
+- `email`: List of email addresses for this service
+- `whatsapp`: List of WhatsApp numbers for individual messages
+- `whatsapp_groups`: List of WhatsApp group chat invite links
+
+If a service name is not found in the configuration, the system will use the default recipients.
 
 ## Usage
 
@@ -44,7 +71,7 @@ This application monitors a Grafana dashboard through your computer's camera and
 4. The script will:
    - Capture dashboard images every minute
    - Process the image to detect service status
-   - Send email and WhatsApp alerts when services are detected as down
+   - Send targeted notifications to service-specific teams when services are down
    - Print status updates to the console
 
 Press Ctrl+C to stop monitoring.
@@ -54,9 +81,11 @@ Press Ctrl+C to stop monitoring.
 1. **Image Capture**: Uses OpenCV to capture images from your camera
 2. **Color Detection**: Processes images in HSV color space to detect red (down) and green (up) indicators
 3. **Text Extraction**: Uses Tesseract OCR to extract service names from regions around color indicators
-4. **Alert System**: 
-   - Sends email alerts via SMTP
-   - Sends WhatsApp messages via pywhatkit
+4. **Smart Notification System**: 
+   - Matches detected service names with configured teams
+   - Sends email alerts via SMTP to service-specific teams
+   - Sends WhatsApp messages to individual numbers and group chats
+   - Falls back to default recipients if no specific configuration is found
 
 ## Troubleshooting
 
@@ -68,6 +97,10 @@ Press Ctrl+C to stop monitoring.
    - Make sure you're logged into WhatsApp Web in your default browser
    - The first time you run the script, you may need to scan the QR code
    - If messages aren't sending, try increasing the `wait_time` parameter in the code
+6. **Service Matching**:
+   - Service names are matched case-insensitively
+   - Special characters are removed for matching
+   - If a service doesn't match any configuration, default recipients are used
 
 ## License
 
