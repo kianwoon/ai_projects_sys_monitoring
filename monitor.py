@@ -19,7 +19,7 @@ load_dotenv()
 
 class DashboardMonitor:
     def __init__(self):
-        self.camera = cv2.VideoCapture(0)  # Use default camera
+        self.camera = None  # Initialize camera later
         self.email_sender = os.getenv('EMAIL_SENDER')
         self.email_password = os.getenv('EMAIL_PASSWORD')
         self.email_recipients = os.getenv('EMAIL_RECIPIENTS', '').split(',')
@@ -39,6 +39,9 @@ class DashboardMonitor:
         # Create logs directory if it doesn't exist
         self.logs_dir = Path('service_logs')
         self.logs_dir.mkdir(exist_ok=True)
+
+        # Initialize camera with user selection
+        self.initialize_camera()
 
     def _load_service_configs(self):
         """Load and parse service-specific configurations from environment"""
@@ -101,6 +104,56 @@ class DashboardMonitor:
                 alert_type or '',
                 ', '.join(recipients) if recipients else ''
             ])
+
+    def list_cameras(self):
+        """List all available cameras and their working status"""
+        available_cameras = []
+        for i in range(10):  # Check first 10 indexes
+            cap = cv2.VideoCapture(i)
+            if cap.isOpened():
+                ret, frame = cap.read()
+                if ret:
+                    camera_name = f"Camera {i}"
+                    try:
+                        # Try to get camera name (works on some systems)
+                        cap.set(cv2.CAP_PROP_SETTINGS, 1)
+                    except:
+                        pass
+                    available_cameras.append((i, camera_name))
+                cap.release()
+        return available_cameras
+
+    def initialize_camera(self):
+        """Initialize camera with user selection"""
+        available_cameras = self.list_cameras()
+        
+        if not available_cameras:
+            raise Exception("No cameras found!")
+        
+        print("\nAvailable cameras:")
+        for idx, (camera_id, camera_name) in enumerate(available_cameras):
+            print(f"{idx + 1}. {camera_name} (ID: {camera_id})")
+        
+        if len(available_cameras) == 1:
+            selected_idx = 0
+            print(f"\nAutomatically selected the only available camera: {available_cameras[0][1]}")
+        else:
+            while True:
+                try:
+                    selected_idx = int(input("\nSelect a camera (enter the number): ")) - 1
+                    if 0 <= selected_idx < len(available_cameras):
+                        break
+                    print("Invalid selection. Please try again.")
+                except ValueError:
+                    print("Invalid input. Please enter a number.")
+        
+        camera_id = available_cameras[selected_idx][0]
+        self.camera = cv2.VideoCapture(camera_id)
+        
+        if not self.camera.isOpened():
+            raise Exception(f"Failed to initialize camera {camera_id}")
+        
+        print(f"\nSuccessfully initialized camera {available_cameras[selected_idx][1]}")
 
     def capture_dashboard(self):
         """Capture an image from the camera"""
@@ -262,4 +315,4 @@ class DashboardMonitor:
 
 if __name__ == "__main__":
     monitor = DashboardMonitor()
-    monitor.monitor() 
+    monitor.monitor()
