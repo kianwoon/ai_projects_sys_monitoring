@@ -2,7 +2,7 @@ opencv-python==4.9.0.80
 numpy==1.26.4
 pytesseract==0.3.10
 python-dotenv==1.0.1
-Pillow==10.2.0
+Pillow>=10.3.0
 pywhatkit==5.4
 setuptools>=65.5.1
 wheel>=0.38.0
