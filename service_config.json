@@ -1,0 +1,13 @@
+{
+    "default_config": {
+        "email": ["example@domain.com"],
+        "whatsapp": ["+1234567890"],
+        "whatsapp_groups": []
+    },
+    "services": {
+        "Sample Service": {
+            "email": ["alert@domain.com"],
+            "whatsapp": ["+1987654321"]
+        }
+    }
+}
