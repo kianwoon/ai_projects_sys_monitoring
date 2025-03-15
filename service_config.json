@@ -1,13 +1,37 @@
 {
     "default_config": {
-        "email": ["example@domain.com"],
-        "whatsapp": ["+1234567890"],
-        "whatsapp_groups": []
+        "email": [
+            "Default_support1@domain.com"
+        ],
+        "whatsapp": [
+            "+1234567890111"
+        ],
+        "whatsapp_groups": [
+            "group 12"
+        ]
     },
     "services": {
-        "Sample Service": {
-            "email": ["alert@domain.com"],
-            "whatsapp": ["+1987654321"]
+        "db22": {
+            "email": [
+                "support22@test.com"
+            ],
+            "whatsapp": [
+                "2+111122"
+            ],
+            "whatsapp_groups": [
+                "2"
+            ]
+        },
+        "webserver22": {
+            "email": [
+                "alert12@domain.com"
+            ],
+            "whatsapp": [
+                "1+1987654321"
+            ],
+            "whatsapp_groups": [
+                "1"
+            ]
         }
     }
 }

@@ -79,26 +79,32 @@ Timestamp,Service Name,Status,Alert Sent,Alert Type,Recipients
 2023-03-15 14:31:45,api-gateway,UP,False,,
 ```
 
-## Alert Configuration UI
+## Service Management UI
 
-The application features an Alert Configuration UI with a top-and-bottom layout. This UI allows users to manage alert configurations for different services.
+The service management UI has been enhanced to improve usability and functionality. The following changes have been made:
 
-### Features
+### Treeview Layout
+- The services are now displayed in a grid format using a `ttk.Treeview`.
+- The columns include:
+  - **Service Name**: The name of the service.
+  - **Email**: Email addresses associated with the service.
+  - **WhatsApp**: WhatsApp numbers for notifications.
+  - **WhatsApp Groups**: Groups for WhatsApp notifications.
 
-- Service management features including adding, editing, and deleting services.
-- Alert configuration features including setting notification targets for different services.
+### Adding and Managing Services
+- Users can add new services using the `+ New Service` button.
+- The `Default Configuration` button allows users to load predefined settings for alerts.
+- Upon selecting a service from the grid, users can edit its details.
 
-### Installation
+### Example Configuration
+- The configuration for services is stored in a JSON format, which includes email and WhatsApp settings.
+- Ensure that the `service_config.json` file is updated accordingly to reflect any changes made in the UI.
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/kianwoon/ai_projects_sys_monitoring.git
-   cd ai_projects_sys_monitoring
-   ```
-2. Install the required packages:
-   ```bash
-   pip install -r requirements.txt
-   ```
+### Usage Instructions
+- To run the application, use the command: `python3 monitor.py`
+- Ensure all dependencies are installed as specified in `requirements.txt`.
+
+For further details on the configuration, refer to the `service_config.json` file.
 
 ## Usage
 

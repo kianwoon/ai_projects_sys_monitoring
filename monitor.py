@@ -44,11 +44,12 @@ class ConfigManager:
             json.dump(self.config, f, indent=4)
 
     def get_service_config(self, service_name):
-        normalized_name = re.sub(r'[^a-zA-Z0-9-]', '', service_name.lower())
-        
+        # Use the original service name for matching
+        lower_service_name = service_name.lower()
+
         # Try to find matching service configuration
         for config_name in self.config['services']:
-            if normalized_name in config_name.lower() or config_name.lower() in normalized_name:
+            if lower_service_name == config_name.lower():
                 return self.config['services'][config_name]
         
         # Return default configuration if no match found
@@ -61,7 +62,27 @@ class AlertConfigUI:
         self.window.title("Alert Configuration")
         self.window.geometry("800x600")
         self.window.configure(bg='#F0F0F0')
-        
+
+        # Create a canvas for scrolling
+        self.canvas = tk.Canvas(self.window)
+        self.scrollbar = tk.Scrollbar(self.window, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = tk.Frame(self.canvas)
+
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        )
+
+        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+
+        # Pack the canvas and scrollbar
+        self.scrollbar.pack(side="right", fill="y")
+        self.canvas.pack(side="left", fill="both", expand=True)
+
+        # Initialize feedback label
+        self.feedback_label = ttk.Label(self.scrollable_frame, text="", style='Success.TLabel')
+
         # Apply styles
         self._setup_styles()
         
@@ -112,7 +133,7 @@ class AlertConfigUI:
     def _create_ui(self):
         """Create the main UI components"""
         # Main container with top-bottom split
-        self.main_container = ttk.Frame(self.window)
+        self.main_container = ttk.Frame(self.scrollable_frame)
         self.main_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
         # Create top frame for service list
@@ -128,7 +149,7 @@ class AlertConfigUI:
         self.show_empty_details()
         
         # Populate service list
-        self.populate_service_list()
+        self._populate_services()
         
         # Debug: Ensure the UI is fully initialized
         print("UI created and populated.")
@@ -138,51 +159,23 @@ class AlertConfigUI:
         self.top_frame = ttk.Frame(self.main_container)
         self.top_frame.pack(fill=tk.X, padx=5, pady=5)
         
-        # Title Label
-        title_label = ttk.Label(self.top_frame, text="Alert Configuration", font=('Segoe UI', 14, 'bold'))
-        title_label.pack(side=tk.TOP, pady=(10, 5))
+        # Add 'New Service' and 'Default Configuration' buttons
+        self.new_service_button = ttk.Button(self.top_frame, text='+ New Service', command=self.add_new_service)
+        self.new_service_button.pack(side=tk.LEFT, padx=5)
+
+        self.default_config_button = ttk.Button(self.top_frame, text='Default Configuration', command=lambda: self.load_default_config())
+        self.default_config_button.pack(side=tk.LEFT, padx=5)
         
-        # Search field
-        search_row = ttk.Frame(self.top_frame)
-        search_row.pack(fill=tk.X, padx=10, pady=(10, 5))
+        # Create Treeview for services
+        self.tree = ttk.Treeview(self.main_container, columns=('Service Name', 'Email', 'WhatsApp', 'WhatsApp Groups'), show='headings')
+        self.tree.heading('#1', text='Service Name')
+        self.tree.heading('#2', text='Email')
+        self.tree.heading('#3', text='WhatsApp')
+        self.tree.heading('#4', text='WhatsApp Groups')
+        self.tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        ttk.Label(search_row, text="Search:").pack(side=tk.LEFT, padx=(0, 5))
-        self.search_var = tk.StringVar()
-        self.search_var.trace_add("write", self.filter_services)
-        search_entry = ttk.Entry(search_row, textvariable=self.search_var, width=30)
-        search_entry.pack(side=tk.LEFT, padx=(0, 10))
-        CreateToolTip(search_entry, "Filter services by name")
-        
-        # Add new service button
-        add_btn = ttk.Button(search_row, text="+ New Service", style='Add.TButton',
-                           command=self.add_new_service)
-        add_btn.pack(side=tk.RIGHT, padx=5)
-        CreateToolTip(add_btn, "Create a new service configuration")
-        
-        # Create service list frame
-        self.list_frame = ttk.LabelFrame(self.top_frame, text="Services")
-        self.list_frame.pack(fill=tk.X, padx=5, pady=5)
-        
-        # Service list with scrollbar
-        list_container = ttk.Frame(self.list_frame)
-        list_container.pack(fill=tk.X, padx=10, pady=(5, 10))
-        
-        canvas_height = 150  # Fixed height for service list
-        self.canvas = tk.Canvas(list_container, height=canvas_height, bg='#F0F0F0',
-                              highlightthickness=1, highlightbackground='#C0C0C0')
-        scrollbar = ttk.Scrollbar(list_container, orient=tk.VERTICAL, command=self.canvas.yview)
-        
-        self.canvas.configure(yscrollcommand=scrollbar.set)
-        self.canvas.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        self.service_list_frame = ttk.Frame(self.canvas)
-        self.canvas_frame = self.canvas.create_window((0, 0), window=self.service_list_frame, anchor=tk.NW)
-        self.service_list_frame.bind("<Configure>", self.on_frame_configure)
-        self.canvas.bind("<Configure>", self.on_canvas_configure)
-        
-        # Populate service list
-        self.populate_service_list()
+        # Bind selection event
+        self.tree.bind('<<TreeviewSelect>>', self._on_service_selected)
     
     def _create_bottom_section(self):
         """Create the bottom section for service details"""
@@ -207,63 +200,25 @@ class AlertConfigUI:
         self.status_label = ttk.Label(status_frame, text="Ready", padding=(10, 3))
         self.status_label.pack(side=tk.LEFT)
     
-    def on_frame_configure(self, event):
-        """Reset the scroll region to encompass the inner frame"""
-        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+    def _on_service_selected(self, event):
+        selected = self.tree.selection()
+        if selected:
+            service_name = self.tree.item(selected, 'text')
+            self.load_service(service_name)
     
-    def on_canvas_configure(self, event):
-        """When the canvas changes size, resize the window within it"""
-        self.canvas.itemconfig(self.canvas_frame, width=event.width)
-    
-    def center_window(self):
-        """Center the window on the screen"""
-        self.window.update_idletasks()
-        width = self.window.winfo_width()
-        height = self.window.winfo_height()
-        x = (self.window.winfo_screenwidth() // 2) - (width // 2)
-        y = (self.window.winfo_screenheight() // 2) - (height // 2)
-        self.window.geometry(f'+{x}+{y}')
-    
-    def populate_service_list(self):
-        """Populate the service list with buttons"""
-        # Clear existing buttons
-        for widget in self.service_list_frame.winfo_children():
-            widget.destroy()
-        
-        # Debug: Check if services are loaded
-        print("Loaded services:", self.config_manager.config['services'])
-        
-        # Add default configuration button
-        default_btn = ttk.Button(self.service_list_frame, text="Default Configuration", 
-                               command=lambda: self.load_default_config())
-        default_btn.pack(fill=tk.X, padx=5, pady=2)
-        
-        # Add service buttons
-        for service_name in sorted(self.config_manager.config['services'].keys()):
-            if self.search_var.get().lower() in service_name.lower() or not self.search_var.get():
-                service_btn = ttk.Button(self.service_list_frame, text=service_name,
-                                       command=lambda s=service_name: self.load_service(s))
-                service_btn.pack(fill=tk.X, padx=5, pady=2)
-        
-        # Debug: Check if buttons were added
-        print("Service buttons added:", [btn.cget('text') for btn in self.service_list_frame.winfo_children()])
-    
-    def filter_services(self, *args):
-        """Filter services based on search text"""
-        self.populate_service_list()
-    
-    def show_empty_details(self):
-        """Show empty details panel with message"""
-        # Clear existing widgets
-        for widget in self.details_frame.winfo_children():
-            widget.destroy()
-        
-        # Show message
-        message_frame = ttk.Frame(self.details_frame)
-        message_frame.pack(expand=True, fill=tk.BOTH)
-        
-        ttk.Label(message_frame, text="Select a service from the list or create a new one",
-                style='Subheader.TLabel').pack(expand=True)
+    def _populate_services(self):
+        # Clear existing items
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+
+        # Add services to Treeview with their details
+        for service_name, service_config in self.config_manager.config['services'].items():
+            self.tree.insert('', 'end', text=service_name, values=(
+                service_name,
+                ','.join(service_config.get('email', [])),
+                ','.join(service_config.get('whatsapp', [])),
+                ','.join(service_config.get('whatsapp_groups', []))
+            ))
     
     def add_new_service(self):
         """Prepare UI for adding a new service"""
@@ -287,251 +242,190 @@ class AlertConfigUI:
         self.status_label.configure(text="Editing default configuration")
     
     def show_default_form(self):
-        """Show form for default configuration"""
-        # Clear existing widgets
+        """Show form for default configuration in the bottom section."""
+        # 1) Clear whatever was in details_frame
         for widget in self.details_frame.winfo_children():
             widget.destroy()
-        
-        # Create form container with padding
+
+        # 2) Create a container frame inside details_frame
         form_container = ttk.Frame(self.details_frame, padding=20)
         form_container.pack(fill=tk.BOTH, expand=True)
-        
-        # Header
-        ttk.Label(form_container, text="Default Alert Configuration", 
-                style='Header.TLabel').pack(anchor=tk.W, pady=(0, 10))
-        
-        # Description
-        ttk.Label(form_container, text="These settings will be used when no specific service configuration matches.",
-                wraplength=700).pack(anchor=tk.W, pady=(0, 15))
-        
-        # Email configuration
+
+        # 3) Header
+        ttk.Label(
+            form_container,
+            text="Default Alert Configuration",
+            style='Header.TLabel'
+        ).pack(anchor=tk.W, pady=(0, 10))
+
+        # 4) Description
+        ttk.Label(
+            form_container,
+            text="These settings will be used when no specific service configuration matches.",
+            wraplength=700
+        ).pack(anchor=tk.W, pady=(0, 15))
+
+        # ====================== 
+        #  Email Notifications
+        # ====================== 
         email_frame = ttk.LabelFrame(form_container, text="Email Notifications")
         email_frame.pack(fill=tk.X, pady=(0, 15))
-        
+
         email_inner = ttk.Frame(email_frame, padding=10)
         email_inner.pack(fill=tk.X)
-        
+
         ttk.Label(email_inner, text="Email Addresses:").pack(anchor=tk.W, pady=(0, 5))
-        
+
         self.default_email = ttk.Entry(email_inner, width=60)
         self.default_email.pack(fill=tk.X, pady=(0, 5))
-        self.default_email.insert(0, ','.join(self.config_manager.config['default_config']['email']))
-        
-        # Email hint
-        hint_label = ttk.Label(email_inner, text="Separate multiple addresses with commas (e.g., user@example.com, another@example.com)",
-                             style='Hint.TLabel')
-        hint_label.pack(anchor=tk.W)
-        
-        # WhatsApp configuration
+
+        # Insert existing default emails from config
+        default_emails = self.config_manager.config['default_config'].get('email', [])
+        self.default_email.insert(0, ','.join(default_emails))
+
+        ttk.Label(
+            email_inner,
+            text="Separate multiple addresses with commas (e.g., user@example.com, another@example.com)",
+            style='Hint.TLabel'
+        ).pack(anchor=tk.W)
+
+        # ========================= 
+        #  WhatsApp Notifications
+        # ========================= 
         whatsapp_frame = ttk.LabelFrame(form_container, text="WhatsApp Notifications")
         whatsapp_frame.pack(fill=tk.X, pady=(0, 15))
-        
+
         whatsapp_inner = ttk.Frame(whatsapp_frame, padding=10)
         whatsapp_inner.pack(fill=tk.X)
-        
+
+        # --- WhatsApp Numbers ---
         ttk.Label(whatsapp_inner, text="WhatsApp Numbers:").pack(anchor=tk.W, pady=(0, 5))
-        
+
         self.default_whatsapp = ttk.Entry(whatsapp_inner, width=60)
         self.default_whatsapp.pack(fill=tk.X, pady=(0, 5))
-        self.default_whatsapp.insert(0, ','.join(self.config_manager.config['default_config']['whatsapp']))
-        
-        # WhatsApp hint
-        hint_label = ttk.Label(whatsapp_inner, text="Separate multiple numbers with commas (include country code, e.g., +1234567890)",
-                             style='Hint.TLabel')
-        hint_label.pack(anchor=tk.W)
-        
-        # Create tooltips
-        CreateToolTip(self.default_email, "Enter email addresses that will receive alerts when no service-specific configuration exists")
-        CreateToolTip(self.default_whatsapp, "Enter WhatsApp numbers that will receive alerts when no service-specific configuration exists")
-        
-        # Buttons
+
+        default_whatsapp_nums = self.config_manager.config['default_config'].get('whatsapp', [])
+        self.default_whatsapp.insert(0, ','.join(default_whatsapp_nums))
+
+        ttk.Label(
+            whatsapp_inner,
+            text="Separate multiple numbers with commas (include country code, e.g., +1234567890)",
+            style='Hint.TLabel'
+        ).pack(anchor=tk.W)
+
+        # --- WhatsApp Groups (optional) ---
+        ttk.Label(whatsapp_inner, text="WhatsApp Groups:").pack(anchor=tk.W, pady=(10, 5))
+
+        self.default_whatsapp_groups = ttk.Entry(whatsapp_inner, width=60)
+        self.default_whatsapp_groups.pack(fill=tk.X, pady=(0, 5))
+
+        default_whatsapp_grps = self.config_manager.config['default_config'].get('whatsapp_groups', [])
+        self.default_whatsapp_groups.insert(0, ','.join(default_whatsapp_grps))
+
+        ttk.Label(
+            whatsapp_inner,
+            text="Separate multiple group IDs or links with commas",
+            style='Hint.TLabel'
+        ).pack(anchor=tk.W)
+
+        # ========================= 
+        #  Buttons (Save/Cancel)
+        # ========================= 
         button_frame = ttk.Frame(form_container)
         button_frame.pack(fill=tk.X, pady=(20, 0))
-        
-        # Feedback label (initially hidden)
+
         self.feedback_label = ttk.Label(button_frame, text="", style='Success.TLabel')
         self.feedback_label.pack(side=tk.LEFT, padx=5)
-        
-        # Save button
-        save_btn = ttk.Button(button_frame, text="Save Changes", 
-                             command=self.save_default_config, width=15)
+
+        save_btn = ttk.Button(
+            button_frame,
+            text="Save Changes",
+            command=self.save_default_config,
+            width=15
+        )
         save_btn.pack(side=tk.RIGHT, padx=5)
-        
-        # Cancel button
-        cancel_btn = ttk.Button(button_frame, text="Cancel", 
-                               command=self.show_empty_details, width=15)
+
+        cancel_btn = ttk.Button(
+            button_frame,
+            text="Cancel",
+            command=self.show_empty_details,
+            width=15
+        )
         cancel_btn.pack(side=tk.RIGHT, padx=5)
-    
-    def show_service_form(self):
-        """Show form for service configuration"""
-        # Clear existing widgets
-        for widget in self.details_frame.winfo_children():
-            widget.destroy()
-        
-        # Create form container with padding
-        form_container = ttk.Frame(self.details_frame, padding=20)
-        form_container.pack(fill=tk.BOTH, expand=True)
-        
-        # Header
-        if self.is_new_service:
-            ttk.Label(form_container, text="Add New Service", 
-                    style='Header.TLabel').pack(anchor=tk.W, pady=(0, 20))
-        else:
-            ttk.Label(form_container, text=f"Edit Service: {self.current_service}", 
-                    style='Header.TLabel').pack(anchor=tk.W, pady=(0, 20))
-        
-        # Service Name
-        name_frame = ttk.Frame(form_container)
-        name_frame.pack(fill=tk.X, pady=(0, 15))
-        
-        ttk.Label(name_frame, text="Service Name:").pack(anchor=tk.W, pady=(0, 5))
-        
-        self.service_name_var = tk.StringVar()
-        if not self.is_new_service:
-            self.service_name_var.set(self.current_service)
-        
-        self.service_name_entry = ttk.Entry(name_frame, width=40, textvariable=self.service_name_var)
-        self.service_name_entry.pack(fill=tk.X, pady=(0, 5))
-        
-        if not self.is_new_service:
-            self.service_name_entry.configure(state='readonly')
-        
-        # Service name hint
-        if self.is_new_service:
-            hint_label = ttk.Label(name_frame, text="Enter a unique name for this service (e.g., 'Database Server', 'Web Application')",
-                                 style='Hint.TLabel')
-            hint_label.pack(anchor=tk.W)
-        
-        # Email configuration
-        email_frame = ttk.LabelFrame(form_container, text="Email Notifications")
-        email_frame.pack(fill=tk.X, pady=(0, 15))
-        
-        email_inner = ttk.Frame(email_frame, padding=10)
-        email_inner.pack(fill=tk.X)
-        
-        ttk.Label(email_inner, text="Email Addresses:").pack(anchor=tk.W, pady=(0, 5))
-        
-        self.email_var = tk.StringVar()
-        if not self.is_new_service:
-            self.email_var.set(','.join(self.config_manager.config['services'][self.current_service]['email']))
-        
-        self.email_entry = ttk.Entry(email_inner, width=60, textvariable=self.email_var)
-        self.email_entry.pack(fill=tk.X, pady=(0, 5))
-        
-        # Email hint
-        hint_label = ttk.Label(email_inner, text="Separate multiple addresses with commas (e.g., user@example.com, another@example.com)",
-                             style='Hint.TLabel')
-        hint_label.pack(anchor=tk.W)
-        
-        # WhatsApp configuration
-        whatsapp_frame = ttk.LabelFrame(form_container, text="WhatsApp Notifications")
-        whatsapp_frame.pack(fill=tk.X, pady=(0, 15))
-        
-        whatsapp_inner = ttk.Frame(whatsapp_frame, padding=10)
-        whatsapp_inner.pack(fill=tk.X)
-        
-        ttk.Label(whatsapp_inner, text="WhatsApp Numbers:").pack(anchor=tk.W, pady=(0, 5))
-        
-        self.whatsapp_var = tk.StringVar()
-        if not self.is_new_service:
-            self.whatsapp_var.set(','.join(self.config_manager.config['services'][self.current_service]['whatsapp']))
-        
-        self.whatsapp_entry = ttk.Entry(whatsapp_inner, width=60, textvariable=self.whatsapp_var)
-        self.whatsapp_entry.pack(fill=tk.X, pady=(0, 5))
-        
-        # WhatsApp hint
-        hint_label = ttk.Label(whatsapp_inner, text="Separate multiple numbers with commas (include country code, e.g., +1234567890)",
-                             style='Hint.TLabel')
-        hint_label.pack(anchor=tk.W)
-        
-        # Create tooltips
-        CreateToolTip(self.service_name_entry, "The name of the service to monitor")
-        CreateToolTip(self.email_entry, "Enter email addresses that will receive alerts for this service")
-        CreateToolTip(self.whatsapp_entry, "Enter WhatsApp numbers that will receive alerts for this service")
-        
-        # Buttons
-        button_frame = ttk.Frame(form_container)
-        button_frame.pack(fill=tk.X, pady=(20, 0))
-        
-        # Feedback label (initially hidden)
-        self.feedback_label = ttk.Label(button_frame, text="", style='Success.TLabel')
-        self.feedback_label.pack(side=tk.LEFT, padx=5)
-        
-        # Save button
-        save_btn = ttk.Button(button_frame, text="Save Changes", 
-                             command=self.save_service, width=15)
-        save_btn.pack(side=tk.RIGHT, padx=5)
-        
-        # Cancel button
-        cancel_btn = ttk.Button(button_frame, text="Cancel", 
-                               command=self.show_empty_details, width=15)
-        cancel_btn.pack(side=tk.RIGHT, padx=5)
-        
-        # Delete button (only for existing services)
-        if not self.is_new_service and self.current_service != "default":
-            delete_btn = ttk.Button(button_frame, text="Delete Service", 
-                                   command=self.delete_service, width=15)
-            delete_btn.pack(side=tk.RIGHT, padx=5)
-            
-            # Tooltip for delete button
-            CreateToolTip(delete_btn, "Permanently delete this service configuration")
-    
+
     def save_default_config(self):
-        """Save default configuration"""
-        self.config_manager.config['default_config']['email'] = [
-            e.strip() for e in self.default_email.get().split(',') if e.strip()
-        ]
-        self.config_manager.config['default_config']['whatsapp'] = [
-            w.strip() for w in self.default_whatsapp.get().split(',') if w.strip()
-        ]
-        
+        # Gather fields
+        emails = [e.strip() for e in self.default_email.get().split(',') if e.strip()]
+        whatsapp_nums = [w.strip() for w in self.default_whatsapp.get().split(',') if w.strip()]
+        whatsapp_grps = [g.strip() for g in self.default_whatsapp_groups.get().split(',') if g.strip()]
+
+        # Update config
+        self.config_manager.config['default_config']['email'] = emails
+        self.config_manager.config['default_config']['whatsapp'] = whatsapp_nums
+        self.config_manager.config['default_config']['whatsapp_groups'] = whatsapp_grps
+
+        # Save to file
         self.config_manager.save_config()
+
+        # Feedback
+        if hasattr(self, 'feedback_label') and self.feedback_label.winfo_exists():
+            self.feedback_label.configure(text="Default configuration saved successfully!", style='Success.TLabel')
+            self.status_label.configure(text="Default configuration saved")
         
-        # Show feedback
-        self.feedback_label.configure(text="Default configuration saved successfully!", style='Success.TLabel')
-        self.status_label.configure(text="Default configuration saved")
-        
-        # Reset feedback after 3 seconds
-        self.details_frame.after(3000, lambda: self.feedback_label.configure(text=""))
+        # Clear feedback after 3 seconds
+        self.details_frame.after(3000, lambda: self.feedback_label.configure(text="") if hasattr(self, 'feedback_label') and self.feedback_label.winfo_exists() else None)
     
     def save_service(self):
-        """Save service configuration"""
-        # Validate service name for new services
+        # Get the new service name
+        new_name = self.service_name_var.get().strip()
+
+        # If this is a new service, ensure old_name is not None
         if self.is_new_service:
-            service_name = self.service_name_var.get().strip()
-            if not service_name:
-                self.feedback_label.configure(text="Service name is required!", style='Error.TLabel')
-                return
-            
-            if service_name in self.config_manager.config['services']:
-                self.feedback_label.configure(text=f"Service '{service_name}' already exists!", style='Error.TLabel')
-                return
-            
-            self.current_service = service_name
+            old_name = None
         else:
-            service_name = self.current_service
-        
-        # Update or create service
-        self.config_manager.config['services'][service_name] = {
-            'email': [e.strip() for e in self.email_var.get().split(',') if e.strip()],
-            'whatsapp': [w.strip() for w in self.whatsapp_var.get().split(',') if w.strip()],
-            'whatsapp_groups': self.config_manager.config['services'].get(service_name, {}).get('whatsapp_groups', [])
-        }
-        
-        # Save configuration
+            old_name = self.current_service
+
+        # If old_name exists, copy its config to the new name
+        if old_name:
+            self.config_manager.config['services'][new_name] = self.config_manager.config['services'][old_name]
+            if old_name != new_name:
+                del self.config_manager.config['services'][old_name]
+        else:
+            # Create a new service entry
+            self.config_manager.config['services'][new_name] = {
+                'email': [],
+                'whatsapp': [],
+                'whatsapp_groups': []
+            }
+
+        # Now update the email/WhatsApp fields
+        email_list = [e.strip() for e in self.service_email.get().split(',') if e.strip()]
+        whatsapp_list = [w.strip() for w in self.service_whatsapp.get().split(',') if w.strip()]
+        whatsapp_groups_list = [g.strip() for g in self.service_whatsapp_groups.get().split(',') if g.strip()]
+
+        self.config_manager.config['services'][new_name].update({
+            'email': email_list,
+            'whatsapp': whatsapp_list,
+            'whatsapp_groups': whatsapp_groups_list
+        })
+
+        # Save the updated config
         self.config_manager.save_config()
-        
-        # Update UI
-        self.is_new_service = False
-        self.populate_service_list()
-        
-        # Show feedback
-        self.feedback_label.configure(text=f"Service '{service_name}' saved successfully!", style='Success.TLabel')
-        self.status_label.configure(text=f"Service '{service_name}' saved")
-        
-        # Reset feedback after 3 seconds
-        self.details_frame.after(3000, lambda: self.feedback_label.configure(text=""))
-    
+
+        # Show success feedback
+        if hasattr(self, 'feedback_label') and self.feedback_label.winfo_exists():
+            self.feedback_label.configure(
+                text=f"Service '{new_name}' saved successfully!",
+                style='Success.TLabel'
+            )
+            self.status_label.configure(text=f"Service '{new_name}' saved")
+
+            # Clear the feedback after a few seconds
+            self.details_frame.after(3000, lambda: self.feedback_label.configure(text="") if hasattr(self, 'feedback_label') and self.feedback_label.winfo_exists() else None)
+
+        # Re-populate the service list to reflect the new name
+        self._populate_services()
+
     def delete_service(self):
         """Delete the current service"""
         if not self.current_service or self.current_service == "default":
@@ -553,7 +447,7 @@ class AlertConfigUI:
         # Update UI
         self.current_service = None
         self.is_new_service = False
-        self.populate_service_list()
+        self._populate_services()
         self.show_empty_details()
         
         # Show feedback
@@ -564,6 +458,92 @@ class AlertConfigUI:
         self.config_manager.save_config()
         self.status_label.configure(text="Configuration saved successfully")
         self.window.destroy()
+
+    def show_service_form(self):
+        """Show form for editing an existing service (non-default)."""
+        # 1) Clear the details_frame
+        for widget in self.details_frame.winfo_children():
+            widget.destroy()
+
+        form_container = ttk.Frame(self.details_frame, padding=20)
+        form_container.pack(fill=tk.BOTH, expand=True)
+
+        # 2) Header
+        ttk.Label(
+            form_container,
+            text=f"Edit Service: {self.current_service}",
+            style='Header.TLabel'
+        ).pack(anchor=tk.W, pady=(0, 20))
+
+        # 3) Retrieve the existing config
+        service_config = self.config_manager.config['services'].get(self.current_service, {})
+
+        # 4) Create text fields for email, WhatsApp, etc.
+        # Service Name field
+        ttk.Label(form_container, text="Service Name:").pack(anchor=tk.W, pady=(0, 5))
+        self.service_name_var = tk.StringVar(value=self.current_service)
+        self.service_name_entry = ttk.Entry(form_container, width=60, textvariable=self.service_name_var)
+        self.service_name_entry.pack(fill=tk.X, pady=(0, 5))
+
+        # Email field
+        ttk.Label(form_container, text="Email Addresses:").pack(anchor=tk.W, pady=(0, 5))
+        self.service_email = ttk.Entry(form_container, width=60)
+        self.service_email.pack(fill=tk.X, pady=(0, 5))
+        self.service_email.insert(0, ','.join(service_config.get('email', [])))
+
+        # WhatsApp Numbers field
+        ttk.Label(form_container, text="WhatsApp Numbers:").pack(anchor=tk.W, pady=(0, 5))
+        self.service_whatsapp = ttk.Entry(form_container, width=60)
+        self.service_whatsapp.pack(fill=tk.X, pady=(0, 5))
+        self.service_whatsapp.insert(0, ','.join(service_config.get('whatsapp', [])))
+
+        # WhatsApp Groups field
+        ttk.Label(form_container, text="WhatsApp Groups:").pack(anchor=tk.W, pady=(0, 5))
+        self.service_whatsapp_groups = ttk.Entry(form_container, width=60)
+        self.service_whatsapp_groups.pack(fill=tk.X, pady=(0, 5))
+        self.service_whatsapp_groups.insert(0, ','.join(service_config.get('whatsapp_groups', [])))
+
+        # 5) Create a Save button that calls save_service()
+        button_frame = ttk.Frame(form_container)
+        button_frame.pack(fill=tk.X, pady=(20, 0))
+
+        save_btn = ttk.Button(
+            button_frame,
+            text="Save",
+            command=self.save_service,
+            width=15
+        )
+        save_btn.pack(side=tk.RIGHT, padx=5)
+
+        cancel_btn = ttk.Button(
+            button_frame,
+            text="Cancel",
+            command=self.show_empty_details,
+            width=15
+        )
+        cancel_btn.pack(side=tk.RIGHT, padx=5)
+
+    def show_empty_details(self):
+        """Show empty details panel with message"""
+        # Clear existing widgets
+        for widget in self.details_frame.winfo_children():
+            widget.destroy()
+        
+        # Show message
+        message_frame = ttk.Frame(self.details_frame)
+        message_frame.pack(expand=True, fill=tk.BOTH)
+        
+        ttk.Label(message_frame, text="Select a service from the list or create a new one",
+                style='Subheader.TLabel').pack(expand=True)
+    
+    def center_window(self):
+        """Center the window on the screen"""
+        self.window.update_idletasks()
+        width = self.window.winfo_width()
+        height = self.window.winfo_height()
+        x = (self.window.winfo_screenwidth() // 2) - (width // 2)
+        y = (self.window.winfo_screenheight() // 2) - (height // 2)
+        self.window.geometry(f'+{x}+{y}')
 
 class CreateToolTip:
     """Create a tooltip for a given widget"""
