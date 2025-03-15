@@ -60,9 +60,11 @@ class AlertConfigUI:
         # Create a new toplevel window
         self.window = tk.Toplevel(parent)
         self.window.title("Alert Configuration")
-        self.window.geometry("800x600")
+        self.window.geometry("1480x980")  # Set the window dimensions to 1480x980
         self.window.configure(bg='#F0F0F0')
-
+        self.window.minsize(1080, 840)  # Increased minimum size by 20%
+        self.window.resizable(False, False)  # Prevent the window from being resized
+        
         # Create a canvas for scrolling
         self.canvas = tk.Canvas(self.window)
         self.scrollbar = tk.Scrollbar(self.window, orient="vertical", command=self.canvas.yview)
@@ -123,6 +125,7 @@ class AlertConfigUI:
         style.configure('Success.TLabel', foreground='#008800', background='#F0F0F0')
         style.configure('Error.TLabel', foreground='#CC0000', background='#F0F0F0')
         style.configure('Add.TButton', font=('Segoe UI', 9, 'bold'))
+        style.configure('Delete.TButton', font=('Segoe UI', 9, 'bold'), foreground='white', background='red')  # Custom style for delete button
         
         # Make sure all child widgets inherit these styles
         self.window.option_add("*TCombobox*Listbox*Background", 'white')
@@ -153,6 +156,10 @@ class AlertConfigUI:
         
         # Debug: Ensure the UI is fully initialized
         print("UI created and populated.")
+        
+        # Print the width and height of the alert configuration window
+        self.window.update_idletasks()  # Ensure the window is updated before checking size
+        print(f'Alert Configuration Window Size: {self.window.winfo_width()}x{self.window.winfo_height()}')
     
     def _create_top_section(self):
         """Create the top section with service list"""
@@ -163,15 +170,17 @@ class AlertConfigUI:
         self.new_service_button = ttk.Button(self.top_frame, text='+ New Service', command=self.add_new_service)
         self.new_service_button.pack(side=tk.LEFT, padx=5)
 
-        self.default_config_button = ttk.Button(self.top_frame, text='Default Configuration', command=lambda: self.load_default_config())
+        self.default_config_button = ttk.Button(self.top_frame, text='Default Configuration', command=lambda: [self.load_default_config(), self.delete_button.pack_forget()])  # Hide the delete button when default configuration is clicked
         self.default_config_button.pack(side=tk.LEFT, padx=5)
         
         # Create Treeview for services
-        self.tree = ttk.Treeview(self.main_container, columns=('Service Name', 'Email', 'WhatsApp', 'WhatsApp Groups'), show='headings')
+        self.tree = ttk.Treeview(self.main_container, columns=('Service Name', 'Email', 'WhatsApp', 'WhatsApp Groups', 'Alert Period', 'Number of Alerts'), show='headings')
         self.tree.heading('#1', text='Service Name')
         self.tree.heading('#2', text='Email')
         self.tree.heading('#3', text='WhatsApp')
         self.tree.heading('#4', text='WhatsApp Groups')
+        self.tree.heading('#5', text='Alert Period')
+        self.tree.heading('#6', text='Number of Alerts')
         self.tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         # Bind selection event
@@ -192,7 +201,12 @@ class AlertConfigUI:
         # Add a placeholder label to ensure visibility
         placeholder_label = ttk.Label(self.details_frame, text="Service details will appear here.")
         placeholder_label.pack(pady=10)
-    
+        
+        # Delete Service button
+        self.delete_button = ttk.Button(self.bottom_frame, text='Delete Service', command=self.delete_service)
+        self.delete_button.pack_forget()  # Hide the delete button initially
+        self.delete_button.configure(style='Delete.TButton', width=25)  # Increase the width of the delete button
+        
     def _create_status_bar(self):
         """Create the status bar at the bottom of the window"""
         status_frame = ttk.Frame(self.window, relief=tk.SUNKEN, borderwidth=1)
@@ -205,6 +219,7 @@ class AlertConfigUI:
         if selected:
             service_name = self.tree.item(selected, 'text')
             self.load_service(service_name)
+            self.delete_button.pack(side=tk.BOTTOM, padx=5, pady=5)  # Show the delete button
     
     def _populate_services(self):
         # Clear existing items
@@ -217,7 +232,9 @@ class AlertConfigUI:
                 service_name,
                 ','.join(service_config.get('email', [])),
                 ','.join(service_config.get('whatsapp', [])),
-                ','.join(service_config.get('whatsapp_groups', []))
+                ','.join(service_config.get('whatsapp_groups', [])),
+                service_config.get('period', 0),
+                service_config.get('number_of_alerts', 0)
             ))
     
     def add_new_service(self):
@@ -348,7 +365,7 @@ class AlertConfigUI:
         cancel_btn = ttk.Button(
             button_frame,
             text="Cancel",
-            command=self.show_empty_details,
+            command=lambda: [self.show_empty_details(), self.delete_button.pack_forget()],  # Hide the delete button when cancel is clicked
             width=15
         )
         cancel_btn.pack(side=tk.RIGHT, padx=5)
@@ -395,18 +412,24 @@ class AlertConfigUI:
             self.config_manager.config['services'][new_name] = {
                 'email': [],
                 'whatsapp': [],
-                'whatsapp_groups': []
+                'whatsapp_groups': [],
+                'period': 0,
+                'number_of_alerts': 0
             }
 
         # Now update the email/WhatsApp fields
         email_list = [e.strip() for e in self.service_email.get().split(',') if e.strip()]
         whatsapp_list = [w.strip() for w in self.service_whatsapp.get().split(',') if w.strip()]
         whatsapp_groups_list = [g.strip() for g in self.service_whatsapp_groups.get().split(',') if g.strip()]
+        period = int(self.period_entry.get())
+        number_of_alerts = int(self.number_of_alerts_entry.get())
 
         self.config_manager.config['services'][new_name].update({
             'email': email_list,
             'whatsapp': whatsapp_list,
-            'whatsapp_groups': whatsapp_groups_list
+            'whatsapp_groups': whatsapp_groups_list,
+            'period': period,
+            'number_of_alerts': number_of_alerts
         })
 
         # Save the updated config
@@ -503,6 +526,22 @@ class AlertConfigUI:
         self.service_whatsapp_groups.pack(fill=tk.X, pady=(0, 5))
         self.service_whatsapp_groups.insert(0, ','.join(service_config.get('whatsapp_groups', [])))
 
+        # Add fields for period and number of alerts
+        period_frame = ttk.LabelFrame(form_container, text="Alert Settings")
+        period_frame.pack(fill=tk.X, pady=(0, 15))
+
+        # Period field
+        ttk.Label(period_frame, text="Alert Period (minutes):").pack(anchor=tk.W, pady=(0, 5))
+        self.period_entry = ttk.Entry(period_frame, width=60)
+        self.period_entry.pack(fill=tk.X, pady=(0, 5))
+        self.period_entry.insert(0, str(service_config.get('period', 0)))  # Default value
+
+        # Number of Alerts field
+        ttk.Label(period_frame, text="Number of Alerts:").pack(anchor=tk.W, pady=(0, 5))
+        self.number_of_alerts_entry = ttk.Entry(period_frame, width=60)
+        self.number_of_alerts_entry.pack(fill=tk.X, pady=(0, 5))
+        self.number_of_alerts_entry.insert(0, str(service_config.get('number_of_alerts', 0)))  # Default value
+
         # 5) Create a Save button that calls save_service()
         button_frame = ttk.Frame(form_container)
         button_frame.pack(fill=tk.X, pady=(20, 0))
@@ -518,7 +557,7 @@ class AlertConfigUI:
         cancel_btn = ttk.Button(
             button_frame,
             text="Cancel",
-            command=self.show_empty_details,
+            command=lambda: [self.show_empty_details(), self.delete_button.pack_forget()],  # Hide the delete button when cancel is clicked
             width=15
         )
         cancel_btn.pack(side=tk.RIGHT, padx=5)
@@ -811,7 +850,7 @@ class DashboardMonitor:
         selected_camera = self.camera_var.get()
         camera_id = int(re.search(r'ID: (\d+)', selected_camera).group(1))
         
-        self.camera = cv2.VideoCapture(camera_id)
+        self.camera = cv2.VideoCapture(camera_id, cv2.CAP_V4L2)
         if not self.camera.isOpened():
             messagebox.showerror("Error", f"Failed to initialize camera {camera_id}")
             return

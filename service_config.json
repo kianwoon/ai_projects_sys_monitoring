@@ -4,25 +4,16 @@
             "Default_support1@domain.com"
         ],
         "whatsapp": [
-            "+1234567890111"
+            "+3234567890111"
         ],
         "whatsapp_groups": [
-            "group 12"
-        ]
+            "group 123"
+        ],
+        "period": 0,
+        "number_of_alerts": 0
     },
     "services": {
-        "db22": {
-            "email": [
-                "support22@test.com"
-            ],
-            "whatsapp": [
-                "2+111122"
-            ],
-            "whatsapp_groups": [
-                "2"
-            ]
-        },
-        "webserver22": {
+        "webserver223": {
             "email": [
                 "alert12@domain.com"
             ],
@@ -30,8 +21,23 @@
                 "1+1987654321"
             ],
             "whatsapp_groups": [
-                "1"
-            ]
+                "32"
+            ],
+            "period": 30,
+            "number_of_alerts": 3
+        },
+        "appserver": {
+            "email": [
+                "app_support@mail.com"
+            ],
+            "whatsapp": [
+                "22"
+            ],
+            "whatsapp_groups": [
+                "11"
+            ],
+            "period": 30,
+            "number_of_alerts": 1
         }
     }
 }
