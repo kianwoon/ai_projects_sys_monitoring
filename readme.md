@@ -4,7 +4,7 @@ This application monitors a Grafana dashboard through your computer's camera and
 
 ## Prerequisites
 
-1. Python 3.7 or higher
+1. Python 3.13.2 or higher
 2. Tesseract OCR engine installed on your system
 3. A webcam or camera connected to your computer
 4. SMTP access for sending email alerts (e.g., Gmail account)
@@ -79,13 +79,34 @@ Timestamp,Service Name,Status,Alert Sent,Alert Type,Recipients
 2023-03-15 14:31:45,api-gateway,UP,False,,
 ```
 
+## Alert Configuration UI
+
+The application features an Alert Configuration UI with a top-and-bottom layout. This UI allows users to manage alert configurations for different services.
+
+### Features
+
+- Service management features including adding, editing, and deleting services.
+- Alert configuration features including setting notification targets for different services.
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/kianwoon/ai_projects_sys_monitoring.git
+   cd ai_projects_sys_monitoring
+   ```
+2. Install the required packages:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
 ## Usage
 
 1. Position your camera to capture the Grafana dashboard clearly
 2. Ensure you're logged into WhatsApp Web in your default browser
 3. Run the monitoring script:
    ```bash
-   python monitor.py
+   python3 monitor.py
    ```
 
 4. The script will:
