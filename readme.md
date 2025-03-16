@@ -2,6 +2,11 @@
 
 This application monitors a Grafana dashboard through your computer's camera and sends email and WhatsApp alerts when services are detected as down. It uses computer vision and OCR to detect service status based on color indicators (red for down, green for up).
 
+## New Features
+- Improved UI for service configuration, including responsive design and clear button functionalities.
+- Added functionality to load and save service configurations directly from the application.
+- Enhanced error handling for camera initialization and user input validation.
+
 ## Prerequisites
 
 1. Python 3.13.2 or higher
@@ -105,6 +110,51 @@ The service management UI has been enhanced to improve usability and functionali
 - Ensure all dependencies are installed as specified in `requirements.txt`.
 
 For further details on the configuration, refer to the `service_config.json` file.
+
+## File Structure
+
+Here's an overview of the file structure for the service monitoring application:
+
+```
+/Users/kianwoonwong/Downloads/ai_projects_sys_monitoring/
+├── .DS_Store                       # macOS system file
+├── .env                            # Environment variables for the application
+├── .git                            # Git version control directory
+├── .gitattributes                  # Git attributes file
+├── .gitignore                      # Git ignore file
+├── .venv                           # Python virtual environment
+├── Info.plist                      # macOS application settings
+├── __pycache__                     # Compiled Python files
+├── alert_config_ui.py              # UI for configuring alerts
+├── alerts.py                       # Logic for handling alerts
+├── camera.py                       # Camera handling functions
+├── config_manager.py               # Configuration management logic
+├── dashboard_monitor.py             # Logic for monitoring the dashboard
+├── dashboard_ui.py                 # UI for the dashboard
+├── image_processor.py              # Image processing functions
+├── monitor.py                      # Main monitoring script
+├── monitor2.py                     # Alternative monitoring script
+├── readme.md                       # Project documentation
+├── requirements.txt                # Python dependencies
+├── service_config.json             # Configuration file for services
+├── service_logs/                   # Directory for service logs
+├── test.py                         # Test script
+├── ui_utils.py                     # Utility functions for UI
+└── utils/                          # Utility functions directory
+```
+
+### Purpose of Each File
+- **alert_config_ui.py**: Handles the user interface for configuring alert settings.
+- **alerts.py**: Contains logic for sending alerts via email and WhatsApp.
+- **camera.py**: Manages camera initialization and image capture.
+- **config_manager.py**: Manages loading and saving configurations from `service_config.json`.
+- **dashboard_monitor.py**: Monitors the Grafana dashboard and checks service statuses.
+- **dashboard_ui.py**: User interface for the dashboard monitoring.
+- **image_processor.py**: Contains functions for processing images captured from the camera.
+- **monitor.py**: Main entry point for running the application.
+- **requirements.txt**: Lists all the Python dependencies required for the application.
+- **service_config.json**: Stores configurations for different services being monitored.
+- **ui_utils.py**: Contains utility functions for UI components.
 
 ## Version 1.2 Updates
 
