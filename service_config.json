@@ -7,7 +7,7 @@
             "+3234567890111"
         ],
         "whatsapp_groups": [
-            "group 123"
+            "group 1234"
         ],
         "period": 0,
         "number_of_alerts": 0
@@ -24,7 +24,7 @@
                 "32"
             ],
             "period": 30,
-            "number_of_alerts": 3
+            "number_of_alerts": 333
         },
         "appserver": {
             "email": [
@@ -37,7 +37,33 @@
                 "11"
             ],
             "period": 30,
-            "number_of_alerts": 1
+            "number_of_alerts": 111
+        },
+        "test": {
+            "email": [
+                "test"
+            ],
+            "whatsapp": [
+                "123"
+            ],
+            "whatsapp_groups": [
+                "whatsapp"
+            ],
+            "period": 30,
+            "number_of_alerts": 5
+        },
+        "test2": {
+            "email": [
+                "test2email"
+            ],
+            "whatsapp": [
+                "123"
+            ],
+            "whatsapp_groups": [
+                "group 5"
+            ],
+            "period": 30,
+            "number_of_alerts": 2
         }
     }
 }
