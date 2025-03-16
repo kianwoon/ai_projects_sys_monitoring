@@ -106,6 +106,18 @@ The service management UI has been enhanced to improve usability and functionali
 
 For further details on the configuration, refer to the `service_config.json` file.
 
+## Version 1.2 Updates
+
+## Features Added
+- Improved OCR extraction accuracy by implementing morphological line removal techniques.
+- Adjusted rectangle height from 2x to 1.65x the circle height for better visual alignment.
+
+## Bug Fixes
+- Resolved issues with OCR not recognizing multiple lines of text.
+
+## Documentation Updates
+- Updated README.md to reflect the new features and usage instructions.
+
 ## Usage
 
 1. Position your camera to capture the Grafana dashboard clearly
