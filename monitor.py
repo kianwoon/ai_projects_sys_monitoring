@@ -15,6 +15,7 @@ from datetime import datetime
 import time
 import re
 from pathlib import Path
+from PIL import Image, ImageTk
 
 # Load environment variables
 load_dotenv()
@@ -60,9 +61,9 @@ class AlertConfigUI:
         # Create a new toplevel window
         self.window = tk.Toplevel(parent)
         self.window.title("Alert Configuration")
-        self.window.geometry("1480x980")  # Set the window dimensions to 1480x980
+        self.window.geometry('1500x1300')  # Set the main window size to 1500x1300
+        self.window.minsize(1500, 1300)  # Set minimum size to accommodate new dimensions
         self.window.configure(bg='#F0F0F0')
-        self.window.minsize(1080, 840)  # Increased minimum size by 20%
         self.window.resizable(False, False)  # Prevent the window from being resized
         
         # Create a canvas for scrolling
@@ -160,7 +161,7 @@ class AlertConfigUI:
         # Print the width and height of the alert configuration window
         self.window.update_idletasks()  # Ensure the window is updated before checking size
         print(f'Alert Configuration Window Size: {self.window.winfo_width()}x{self.window.winfo_height()}')
-    
+        
     def _create_top_section(self):
         """Create the top section with service list"""
         self.top_frame = ttk.Frame(self.main_container)
@@ -583,6 +584,7 @@ class AlertConfigUI:
         x = (self.window.winfo_screenwidth() // 2) - (width // 2)
         y = (self.window.winfo_screenheight() // 2) - (height // 2)
         self.window.geometry(f'+{x}+{y}')
+        print('Main screen dimensions:', self.window.winfo_width(), 'x', self.window.winfo_height())  # Debug statement to print dimensions
 
 class CreateToolTip:
     """Create a tooltip for a given widget"""
@@ -646,7 +648,9 @@ class DashboardMonitor:
         """Display the desktop UI for camera selection"""
         self.root = tk.Tk()
         self.root.title("Service Monitoring System")
-        self.root.geometry("800x500")
+        self.root.geometry('1500x1300')  # Set the main application window size to 1500x1300
+        self.root.minsize(1500, 1300)  # Set minimum size to accommodate new dimensions
+        self.root.configure(bg='#F0F0F0')
         
         # Set light theme for Windows-like appearance
         self.root.configure(bg='#F0F0F0')
@@ -761,6 +765,18 @@ class DashboardMonitor:
                                command=lambda: AlertConfigUI(self.root))
         config_btn.pack(side=tk.RIGHT, padx=5)
         
+        process_image_button = ttk.Button(button_frame, text="Process Image", width=20,
+                              command=self.process_image)
+        process_image_button.pack(side=tk.RIGHT, padx=5)
+        
+        # Create a frame for image preview
+        self.image_frame = ttk.Frame(camera_tab)
+        self.image_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        # Add a label to display the image
+        self.image_label = ttk.Label(self.image_frame)
+        self.image_label.pack(padx=10, pady=10)
+
         # Initial camera detection
         self.update_camera_list(camera_dropdown, start_btn)
         
@@ -865,11 +881,129 @@ class DashboardMonitor:
             raise Exception("Failed to capture image from camera")
         return frame
 
-    def process_image(self, image):
+    def process_image(self, image=None):
+        print('Process Image button clicked.')  # Debug statement
         """Process the image to detect service status"""
-        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        if image is None:
+            # Load an image from a predefined path instead of capturing from the camera
+            image_path = 'img/test.jpeg'  # Adjusted path to be relative
+            image = cv2.imread(image_path)
+            if image is None:
+                messagebox.showerror('Error', 'Failed to load image. Please check the file path.')
+                return
+            print('Image loaded successfully from', image_path)  # Debug statement to confirm saving
+        
+        # Keep the original image for processing
+        original_image = image.copy()  # Make a copy of the original image for processing
+        hsv = cv2.cvtColor(original_image, cv2.COLOR_BGR2HSV)
         red_mask = cv2.inRange(hsv, self.red_lower, self.red_upper)
         green_mask = cv2.inRange(hsv, self.green_lower, self.green_upper)
+        
+        # Convert the image from BGR to RGB format
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        # Resize the image to 1024x576 before displaying
+        image = Image.fromarray(image)
+        image = image.resize((1024, 576), Image.LANCZOS)  # Use LANCZOS for resizing
+        image = ImageTk.PhotoImage(image)
+        # Update the label with the new image
+        self.image_label.config(image=image)
+        self.image_label.image = image  # Keep a reference to avoid garbage collection
+        
+        # Process the image to detect orange color
+        annotated_img = original_image.copy()  # Use the original image for annotations
+        lower_orange = np.array([10, 100, 100])   # Lower bound for hue, sat, val
+        upper_orange = np.array([25, 255, 255])   # Upper bound for hue, sat, val
+        mask_orange = cv2.inRange(hsv, lower_orange, upper_orange)
+        contours, hierarchy = cv2.findContours(mask_orange, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        detected_services = []
+
+        for cnt in contours:
+            area = cv2.contourArea(cnt)
+            if area < 50:  # adjust based on your image scale
+                continue
+
+            x, y, w, h = cv2.boundingRect(cnt)
+            aspect_ratio = float(w) / h
+            if 0.9 <= aspect_ratio <= 1.1:  # Allow for 10% difference
+                # Expand the rectangle's width by 40%
+                rectangle_width = int(w * 1.4)  # Rectangle width is 40% wider than circle width
+                rectangle_height = int(h * 2)  # Rectangle height is now 2x the circle height
+
+                # Center horizontally around the circle.
+                # If you want the circle to be near the top so text fits below, 
+                # keep y as-is. We'll clamp to image bounds after.
+                x1 = x + (w // 2) - (rectangle_width // 2)
+                y1 = y
+
+                # Compute bottom-right corner
+                x2 = x1 + rectangle_width
+                y2 = y1 + rectangle_height
+
+                # Clamp to the image boundaries
+                x1 = max(0, x1)
+                y1 = max(0, y1)
+                x2 = min(original_image.shape[1], x2)
+                y2 = min(original_image.shape[0], y2)
+
+                # Draw the expanded rectangle in blue with a bold border
+                cv2.rectangle(annotated_img, (x1, y1), (x2, y2), (255, 0, 0), thickness=3)  # Draw the rectangle in blue
+
+                # Run Tesseract on the bigger ROI with multi-line page segmentation mode
+                custom_config = r'--oem 3 --psm 6'
+                
+                # Crop the rectangle area from the original image
+                cropped_image = original_image[y1:y2, x1:x2]
+                cv2.imwrite('cropped_roi.jpeg', cropped_image)  # Save only the cropped image
+                print("Cropped the rectangle image and saved as 'cropped_roi.jpeg'")  # Debug statement to confirm saving
+
+                # Convert the cropped image to grayscale
+                gray_cropped_image = cv2.cvtColor(cropped_image, cv2.COLOR_BGR2GRAY)
+
+                # Apply Otsu's thresholding
+                _, thresh_image = cv2.threshold(gray_cropped_image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+                # Use the thresholded image for OCR
+                extracted_text = pytesseract.image_to_string(
+                    thresh_image, config=custom_config
+                ).strip()
+
+                # Debug: print out what the OCR extracts from the rectangle box
+                print(repr(extracted_text))
+
+                # Ensure service_name is defined
+                service_name = extracted_text.strip() if extracted_text else ''  # Ensure service_name is defined
+                detected_services.append(service_name)  # Append service_name to detected_services
+                print(f"Circle top: {y}")  # Debug statement to print top positions
+
+                # Debug: Test OCR on the cropped image
+                test_image = cv2.imread('cropped_roi.jpeg')
+                test_extracted_text = pytesseract.image_to_string(test_image, config=custom_config).strip()
+                print(f"OCR extracted from cropped_roi.jpeg: '{test_extracted_text}'")
+
+        # Debug: print the number of circles found
+        print(f"Number of circles found: {len(detected_services)}")
+
+        # Save the annotated image
+        cv2.imwrite('annotated_img.jpeg', annotated_img)
+        print("Saved the rectangle-boxed image as 'annotated_img.jpeg'")  # Debug statement to confirm saving
+        output_path = "dashboard_screenshot_annotated.jpg"
+        cv2.imwrite(output_path, annotated_img)  # Save the original annotated image directly
+        print(f"Annotated image saved to {output_path}")
+
+        # Convert the annotated image to RGB format
+        annotated_img = cv2.cvtColor(annotated_img, cv2.COLOR_BGR2RGB)
+        # Resize the image to 1024x576 before displaying
+        annotated_img = Image.fromarray(annotated_img)
+        annotated_img = annotated_img.resize((1024, 576), Image.LANCZOS)  # Use LANCZOS for resizing
+        annotated_img = ImageTk.PhotoImage(annotated_img)
+        # Update the label with the new image
+        self.image_label.config(image=annotated_img)
+        self.image_label.image = annotated_img  # Keep a reference to avoid garbage collection
+
+        print("Detected service names (OCR):")
+        for s in detected_services:
+            print(f" - {s}")
+        
         return red_mask, green_mask
 
     def extract_text(self, image, mask):
@@ -1068,6 +1202,7 @@ class DashboardMonitor:
         y = (screen_height - height) // 2
         
         self.root.geometry(f'+{x}+{y}')
+        print('Main screen dimensions:', self.root.winfo_width(), 'x', self.root.winfo_height())  # Debug statement to print dimensions
 
 if __name__ == "__main__":
     monitor = DashboardMonitor()
