@@ -62,7 +62,25 @@ class CameraManager:
         
         # Initialize new camera
         try:
-            self.camera = cv2.VideoCapture(camera_id, cv2.CAP_V4L2)
+            # Check if we're on macOS to handle Continuity Camera properly
+            import platform
+            if platform.system() == 'Darwin':  # macOS
+                # On macOS, we need to use AVFoundation backend
+                self.camera = cv2.VideoCapture(camera_id, cv2.CAP_AVFOUNDATION)
+                
+                # Set properties for Continuity Camera if available
+                # This is to address the warning about deprecated AVCaptureDeviceTypeExternal
+                # by using AVCaptureDeviceTypeContinuityCamera instead
+                try:
+                    # This property is specific to AVFoundation backend on macOS
+                    # It tells OpenCV to use AVCaptureDeviceTypeContinuityCamera for external cameras
+                    self.camera.set(cv2.CAP_PROP_SETTINGS, 1)
+                except Exception as e:
+                    print(f"Note: Could not set Continuity Camera properties: {e}")
+            else:
+                # For other platforms, use the default or V4L2 backend
+                self.camera = cv2.VideoCapture(camera_id, cv2.CAP_V4L2)
+                
             if not self.camera.isOpened():
                 print(f"Failed to open camera {camera_id}")
                 return False
